@@ -1,0 +1,7 @@
+services:
+  payments-flow:
+    build: .
+    # Loopback-only publish: put your own reverse proxy / ingress in front of it.
+    ports:
+      - "127.0.0.1:8200:8080"
+    restart: unless-stopped

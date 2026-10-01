@@ -1,0 +1,33 @@
+{
+  "name": "payments-flow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A mock payment gateway with health-scored provider routing, circuit breakers and idempotent retries, drawn as a scroll-driven 3D particle flow from live payment events.",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n gateway,web -c blue,magenta \"npm:dev:gateway\" \"npm:dev:web\"",
+    "dev:gateway": "tsx watch server/main.ts",
+    "dev:web": "vite --config web/vite.config.ts",
+    "build": "vite build --config web/vite.config.ts",
+    "start": "npm run build && tsx server/main.ts",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "lenis": "^1.1.20",
+    "three": "^0.170.0",
+    "tsx": "^4.19.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/three": "^0.170.0",
+    "@types/ws": "^8.5.13",
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
