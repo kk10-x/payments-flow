@@ -6,6 +6,10 @@ A mock payment gateway with health-scored provider routing, circuit breakers and
 
 ![Sending one payment 25 times at once: the gateway answers 24 from its idempotency store and the ledger records a single charge](assets/replay-25x.gif)
 
+| Provider cards and an open breaker | Payment inspector: timeout, then a same-provider retry |
+| --- | --- |
+| ![Beacon's breaker is open: its box is hatched, its card shows the failure dip in the sparkline](assets/degrade.jpg) | ![Payment 1782: Atlas timed out, so the gateway retried Atlas with the same key and got the original charge back](assets/inspector.jpg) |
+
 Most payment-routing demos are diagrams. This one runs the routing: three mock providers that fail, decline and lose responses on command, a router that shifts traffic by observed health, and a retry policy built so a lost response can never charge a card twice. The live counters come from the same event stream that draws the particles.
 
 ## Tech stack
@@ -35,7 +39,7 @@ Most payment-routing demos are diagrams. This one runs the routing: three mock p
 - **The retry rule is the point.** A decline means nothing was charged, so the next attempt can go to another provider. A timeout is different: the provider may already have charged. The gateway then retries only that provider with the same idempotency key, which returns the original charge. Failing over there could charge the card twice. If retries still can't confirm, the payment ends as `unknown` (needs reconciliation) rather than guessing.
 - **Double charges are measured, not assumed.** The service counts idempotency keys charged by more than one provider. That number is shown on the page and asserted to be 0 in the tests.
 - **Mutation-checked.** With the same-provider rule removed, the lost-response test and the chaos test both fail, so the tests do guard the invariant.
-- **Design.** A flat, printed-ledger look on ruled paper: client, gateway, three provider boxes and the ledger drawn as line art on a 2D canvas. Payments are dots travelling along ruled routes, failures are crosses, and a replayed key is a hollow dot that bounces straight back from the gateway. A provider's bar shows its success rate, and an open breaker hatches its box. A receipt-style tape under the diagram stamps each event (captured, timeout, replayed, failed, unknown). Entering a chapter sets up its scenario (for example, Beacon starts declining 90% of charges).
+- **Design.** A flat, printed-ledger look on ruled paper: client, gateway, three provider boxes and the ledger drawn as line art on a 2D canvas. Payments are dots travelling along ruled routes, failures are crosses, and a replayed key is a hollow dot that bounces straight back from the gateway. A provider's bar shows its success rate, and an open breaker hatches its box. Under the diagram, provider cards show a minute-long success sparkline, latency percentiles, traffic share and in-flight count, and a receipt-style tape stamps each event (captured, timeout, replayed, failed, unknown). Click a tape row to open the payment inspector. Entering a chapter sets up its scenario (for example, Beacon starts declining 90% of charges).
 - **Simulated fallback.** If the page can't reach the server (for example on a static host), it runs the same `PaymentService` and `MockProvider` code inside the browser. The header then reads **SIMULATED · IN YOUR BROWSER** instead of **LIVE**.
 
 ## Key features
@@ -44,7 +48,11 @@ Most payment-routing demos are diagrams. This one runs the routing: three mock p
 - Per-provider circuit breaker with open, half-open (single probe) and closed states, covered by unit tests.
 - Idempotency keys that dedupe both concurrent and later repeats. Sending one key 25 times at once produces one charge.
 - Failure injection from the page: provider decline rate, and the rate at which a provider charges but loses its reply.
-- A live ledger: payments, captured, failed, unknown, replays and double charges.
+- **Payment inspector:** click any tape row to see that payment's attempt-by-attempt timeline (which provider, what failed, how long it took, and whether the gateway failed over or retried the same provider, with the reason in plain language), its replay count, and the final outcome.
+- **Provider cards:** success sparkline for the last 60 s, p50 and p95 latency, share of routed traffic, calls in flight, and breaker state, all computed from live attempts.
+- **Real amounts:** payments carry amounts in INR (stored in paise). The ledger shows the captured total in lakh and crore, tape rows show exact amounts, and you can send your own payment with a key and amount.
+- **Explainer:** a decision table (what happened, what it means, what the gateway does), the routing formula and the breaker states, plus what the demo does not model.
+- A live ledger: payments, captured, captured value, failed, unknown, replays and double charges.
 - No WebGL needed. Respects `prefers-reduced-motion` (the diagram stops animating dots; counters and the tape still update).
 
 ## Setup
@@ -77,14 +85,16 @@ Send a payment (the `Idempotency-Key` header is optional; repeat it to get the o
 ```bash
 curl -X POST localhost:8080/api/payments \
   -H 'content-type: application/json' -H 'idempotency-key: order-42' \
-  -d '{"amount": 2500}'
+  -d '{"amount": 249900}'   # amount in paise: ₹2,499.00
 # e.g. {"id":1,"key":"order-42","status":"captured","provider":2,"attempts":1}
 ```
 
 | Method | Path | Body | Purpose |
 | --- | --- | --- | --- |
 | GET | `/api/state` | | Providers (score, circuit, charges, tuning), config and counters |
-| POST | `/api/payments` | `{ amount, key? }` | One payment; `Idempotency-Key` header or `key` sets the key |
+| POST | `/api/payments` | `{ amount, key? }` | One payment (`amount` in paise); `Idempotency-Key` header or `key` sets the key |
+| GET | `/api/payments` | `?limit=20` | Most recent payment records, newest first |
+| GET | `/api/payments/:id` | | One payment's full record: amount, status, replays and every attempt with its explanation |
 | POST | `/api/replay` | `{ n }` | Send one new key `n` times at once; returns how many charges happened |
 | POST | `/api/providers/:id` | `{ failureRate?, lostResponseRate?, latencyMs? }` | Tune a mock provider |
 | POST | `/api/config` | `{ rps?, duplicateRate? }` | Synthetic traffic rate and the share of repeated keys |
@@ -96,6 +106,7 @@ curl -X POST localhost:8080/api/payments \
 - State is in memory: idempotency keys and charges are lost on restart and trimmed after about 6,000 keys. A real system needs a durable store with a TTL.
 - `unknown` payments are only counted. There is no reconciliation job that later asks the provider what happened.
 - Routing weights and breaker thresholds are fixed constants, not tuned against real traffic.
+- INR only. The inspector and the list keep only the most recent 400 payments.
 - Synthetic traffic is capped at 80 payments per second to keep the scene readable. Not load-tested.
 
 ## Why I built this

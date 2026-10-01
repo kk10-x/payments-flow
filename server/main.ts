@@ -102,8 +102,19 @@ export async function createApp(opts: { port?: number; timeoutMs?: number } = {}
       if (path === "/api/payments" && req.method === "POST") {
         const b = await readBody(req);
         const key = String(req.headers["idempotency-key"] ?? b.key ?? `pay_${Math.random().toString(36).slice(2, 10)}`);
-        const amount = clamp(b.amount, 1, 10_000_000, 1000);
+        const amount = clamp(b.amount, 1, 100_000_000, 100_000); // paise (INR minor units)
         return json(res, 200, await service.pay(key, amount));
+      }
+
+      // Inspect payments: recent list, or one payment's full attempt timeline.
+      if (path === "/api/payments" && req.method === "GET") {
+        const limit = clamp(Number(new URL(req.url ?? "/", "http://x").searchParams.get("limit")), 1, 100, 20);
+        return json(res, 200, service.recentRecords(limit));
+      }
+      const pm = path.match(/^\/api\/payments\/(\d+)$/);
+      if (pm && req.method === "GET") {
+        const rec = service.getRecord(Number(pm[1]));
+        return rec ? json(res, 200, rec) : json(res, 404, { error: "payment not found (only the most recent are kept)" });
       }
 
       // Fire the same key `n` times concurrently and report how many charges actually happened.

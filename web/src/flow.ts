@@ -13,7 +13,7 @@ const W = 900;
 const H = 440;
 const CLIENT = { x: 52, y: 220 };
 const GATE = { x: 250, y: 220, w: 96, h: 150 };
-const BOX = { w: 214, h: 92, x: 456 };
+const BOX = { w: 214, h: 78, x: 456 };
 const PROV_Y = [78, 220, 362];
 const LEDGER_X = 862;
 
@@ -299,12 +299,9 @@ export class FlowView {
       ctx.fillStyle = open ? BAD : color;
       ctx.fillRect(bx, by, bw * Math.max(0, Math.min(1, p.successRate)), 6);
       ctx.fillStyle = INK;
-      ctx.font = '500 13px "IBM Plex Mono", monospace';
+      ctx.font = '500 15px "IBM Plex Mono", monospace';
       ctx.textAlign = "left";
-      ctx.fillText(`${Math.round(p.successRate * 100)}% ok`, bx, top + 76);
-      ctx.textAlign = "right";
-      ctx.fillStyle = DIM;
-      ctx.fillText(`${p.charges.toLocaleString("en-US")} charges`, BOX.x + BOX.w - 14, top + 76);
+      ctx.fillText(`${Math.round(p.successRate * 100)}% ok`, bx, top + 66);
     });
 
     // ledger rule with tally ticks

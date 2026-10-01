@@ -1,4 +1,4 @@
-import type { Config, PayEvent, ProviderInfo, ProviderTuning, Stats } from "../../shared/types.ts";
+import type { Config, PayEvent, PaymentRecord, ProviderInfo, ProviderTuning, Stats } from "../../shared/types.ts";
 import { MockProvider } from "../../server/provider.ts";
 import { PaymentService } from "../../server/service.ts";
 
@@ -39,11 +39,16 @@ export class Api {
       name,
       score: 1,
       successRate: 1,
+      p50: null,
+      p95: null,
+      inflight: 0,
+      share: 0,
+      spark: [],
       circuit: "closed",
       charges: 0,
       tuning: { ...DEFAULTS[i]! },
     })),
-    stats: { payments: 0, captured: 0, failed: 0, unknown: 0, replays: 0, doubleCharges: 0 },
+    stats: { payments: 0, captured: 0, capturedAmount: 0, failed: 0, unknown: 0, replays: 0, doubleCharges: 0 },
     config: { rps: 0, duplicateRate: 0.1 },
   };
   private listeners = new Set<Listener>();
@@ -145,6 +150,26 @@ export class Api {
   setProvider(id: number, patch: Partial<ProviderTuning>) {
     if (this.local) Object.assign(this.local.providers[id - 1]!.tuning, patch);
     else void this.post(`api/providers/${id}`, patch);
+  }
+
+  /** Send one payment (amount in paise). Same key twice returns the first result. */
+  async pay(key: string, amount: number): Promise<{ id: number; status: string } | null> {
+    if (this.local) {
+      const o = await this.local.service.pay(key, amount);
+      return { id: o.id, status: o.status };
+    }
+    const res = await fetch(new URL("api/payments", document.baseURI), {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": key },
+      body: JSON.stringify({ amount }),
+    }).catch(() => undefined);
+    return res && res.ok ? ((await res.json()) as { id: number; status: string }) : null;
+  }
+
+  async getPayment(id: number): Promise<PaymentRecord | null> {
+    if (this.local) return this.local.service.getRecord(id) ?? null;
+    const res = await fetch(new URL(`api/payments/${id}`, document.baseURI)).catch(() => undefined);
+    return res && res.ok ? ((await res.json()) as PaymentRecord) : null;
   }
 
   async replay(n: number): Promise<ReplayResult | null> {

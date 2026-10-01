@@ -16,6 +16,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/detail.css" />
   </head>
   <body>
     <header class="bar">
@@ -93,6 +94,16 @@
             <button type="button" id="replay">Send one payment 25 times</button>
           </div>
           <p class="result" id="replay-out" aria-live="polite">&nbsp;</p>
+
+          <form class="send" id="send">
+            <p class="eyebrow">Or send one yourself</p>
+            <div class="fields">
+              <label>Amount (₹)<input id="amt" type="number" min="1" step="0.01" value="2499" /></label>
+              <label>Idempotency key<input id="idem" type="text" value="order-1001" spellcheck="false" autocomplete="off" /></label>
+            </div>
+            <div class="buttons"><button type="submit">Send payment</button></div>
+            <p class="result" id="send-out" aria-live="polite">Send the same key twice: you get the same payment back and the replay count goes up.</p>
+          </form>
         </section>
       </main>
 
@@ -102,15 +113,71 @@
         <dl class="counters" id="ledger">
           <div><dt>payments</dt><dd id="l-payments">0</dd></div>
           <div><dt>captured</dt><dd id="l-captured">0</dd></div>
+          <div><dt>value</dt><dd id="l-value">₹0</dd></div>
           <div><dt>failed</dt><dd id="l-failed" class="bad">0</dd></div>
           <div><dt>unknown</dt><dd id="l-unknown" class="warn">0</dd></div>
           <div><dt>replays</dt><dd id="l-replays">0</dd></div>
           <div class="key"><dt>double charges</dt><dd id="l-double">0</dd></div>
         </dl>
 
-        <ol class="tape" id="tape" aria-label="Recent payment events"></ol>
+        <div class="lower" id="lower">
+          <div class="cards" id="cards" aria-label="Provider health"></div>
+          <div class="tape-wrap">
+            <p class="tape-head">Recent events <span>Click a row to inspect that payment</span></p>
+            <ol class="tape" id="tape" aria-label="Recent payment events"></ol>
+          </div>
+        </div>
+
+        <section class="inspector" id="inspector" hidden aria-live="polite" aria-label="Payment inspector"></section>
       </aside>
     </div>
+
+    <footer class="explain">
+      <div class="wrap">
+        <h2>How the gateway decides</h2>
+
+        <table>
+          <caption>What happened, what it means, what the gateway does</caption>
+          <thead>
+            <tr><th scope="col">What happened</th><th scope="col">What it means</th><th scope="col">What the gateway does</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Declined, or provider error</th><td>Nothing was charged.</td><td>Fails over to the next-best provider.</td></tr>
+            <tr><th scope="row">Timeout, or a lost reply</th><td>Unknown: the provider may have charged.</td><td>Retries the same provider with the same key. Never fails over.</td></tr>
+            <tr><th scope="row">Same key arrives again</th><td>A client retried.</td><td>Returns the first result. No call to any provider.</td></tr>
+            <tr><th scope="row">Retries still can't confirm</th><td>Still unknown.</td><td>Marks the payment <em>unknown</em> for reconciliation instead of guessing.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="cols">
+          <div>
+            <h3>Routing</h3>
+            <p>
+              Each provider gets a score: its recent success rate squared, divided by one plus its latency over
+              300&nbsp;ms. The gateway picks a provider at random with weight score cubed, so a healthy provider gets most
+              of the traffic. A small floor keeps a struggling provider sampled, so its numbers stay fresh and it can
+              recover.
+            </p>
+          </div>
+          <div>
+            <h3>Circuit breaker</h3>
+            <p>
+              <strong>Closed</strong> is normal. After four failures in a row the breaker is <strong>open</strong>: no
+              traffic for three seconds. Then it goes <strong>probe</strong>: exactly one payment is let through. If that
+              succeeds the breaker closes; if it fails, it opens again.
+            </p>
+          </div>
+          <div>
+            <h3>Not modelled</h3>
+            <p>
+              Real providers or card data. Durable storage for idempotency keys (they live in memory). A reconciliation
+              job for unknown payments. Currencies other than INR. Amounts are shown in rupees, with L for lakh and Cr
+              for crore.
+            </p>
+          </div>
+        </div>
+      </div>
+    </footer>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
