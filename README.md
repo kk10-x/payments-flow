@@ -1,4 +1,5 @@
 # Payments Flow
+n[![demo](https://img.shields.io/badge/demo-live-brightgreen)](https://bella.taile86535.ts.net:10000/payments-flow/)
 
 A mock payment gateway with health-scored provider routing, circuit breakers and idempotent retries, drawn as a scroll-driven 3D particle flow. Each particle is a real payment moving through the code, and the page shows a counter that must always read zero: double charges.
 
