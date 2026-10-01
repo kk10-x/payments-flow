@@ -6,113 +6,111 @@
     <title>Payments Flow</title>
     <meta
       name="description"
-      content="A mock payment gateway with health-scored provider routing, circuit breakers and idempotent retries, drawn as a scroll-driven 3D particle flow from live payment events."
+      content="A mock payment gateway with health-scored provider routing, circuit breakers and idempotent retries, drawn as a live printed-ledger diagram from real payment events."
     />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2307080b'/%3E%3Cpath d='M5 16h9l4-7v14l4-7h5' fill='none' stroke='%23e9e4d8' stroke-width='2'/%3E%3C/svg%3E" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23e8ebe5'/%3E%3Cpath d='M4 16h8l4-8v16l4-8h8' fill='none' stroke='%2312181f' stroke-width='2.4'/%3E%3C/svg%3E" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,300;1,6..72,300;1,6..72,400&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <canvas id="stage" aria-hidden="true"></canvas>
-
     <header class="bar">
-      <span class="mark">payments flow</span>
+      <span class="mark">Payments Flow</span>
       <span class="mode" id="mode" role="status">connecting</span>
     </header>
 
-    <main>
-      <section class="chapter" data-chapter="0">
-        <div class="copy">
-          <h1>Follow a payment <em>through the gateway.</em></h1>
+    <div class="layout">
+      <main class="story">
+        <section class="chapter" data-chapter="0">
+          <p class="eyebrow">A gateway, three card providers, one ledger</p>
+          <h1>Follow a payment <span>through the gateway.</span></h1>
           <p>
-            Each particle is a payment passing through a gateway that routes it to one of three
-            card providers. They end up in the ledger on the right, or they don't, and this page
-            shows why.
+            Each dot is a payment passing through a gateway that routes it to one of three card
+            providers. Captured payments reach the ledger on the right. The ones that don't are
+            marked with a cross, and the tape below the diagram says why.
           </p>
-          <p class="hint">Scroll <span aria-hidden="true">↓</span></p>
-        </div>
-      </section>
+          <p class="hint">Scroll to change the scenario ↓</p>
+        </section>
 
-      <section class="chapter" data-chapter="1">
-        <div class="copy">
+        <section class="chapter" data-chapter="1">
+          <p class="eyebrow">Routing</p>
           <h2>Route</h2>
           <p>
             The gateway scores each provider by its recent success rate and latency, then sends
-            each payment to a provider chosen at random, weighted by that score. A healthy
-            provider gets most of the traffic. A brighter cluster means a healthier provider.
+            each payment to a provider chosen at random, weighted by that score. A healthy provider
+            gets most of the traffic, and a longer bar means a healthier one.
           </p>
           <label class="control">
             <span>Traffic <output id="rps-out">20</output> payments/s</span>
             <input id="rps" type="range" min="0" max="60" value="20" />
           </label>
-        </div>
-      </section>
+        </section>
 
-      <section class="chapter" data-chapter="2">
-        <div class="copy">
+        <section class="chapter" data-chapter="2">
+          <p class="eyebrow">Circuit breaker</p>
           <h2>Degrade</h2>
           <p>
-            Beacon is now declining <output id="fail-out">90</output>% of charges. Its score
-            drops, traffic drains toward Atlas and Crest, and after four failures in a row its
-            circuit breaker opens. The cluster scatters and gets no traffic for three seconds,
-            then one probe request tests it.
+            Beacon is now declining <output id="fail-out">90</output>% of charges. Its bar shrinks,
+            traffic drains toward Atlas and Crest, and after four failures in a row its circuit
+            breaker opens. The box is hatched and gets no traffic for three seconds, then one probe
+            payment tests it.
           </p>
           <label class="control">
             <span>Beacon declines <output id="fail-out2">90</output>% of charges</span>
             <input id="fail" type="range" min="0" max="100" value="90" />
           </label>
-        </div>
-      </section>
+        </section>
 
-      <section class="chapter" data-chapter="3">
-        <div class="copy">
+        <section class="chapter" data-chapter="3">
+          <p class="eyebrow">Retry policy</p>
           <h2>Retry</h2>
           <p>
             Atlas now charges the card, then loses <output id="lost-out">40</output>% of its
-            replies. The gateway can't tell whether that payment went through. So it retries
-            Atlas with the same idempotency key, and Atlas returns the charge it already made.
-            Sending it to Beacon instead could charge the card twice.
+            replies. The gateway can't tell whether that payment went through. So it retries Atlas
+            with the same idempotency key, and Atlas returns the charge it already made. Sending it
+            to Beacon instead could charge the card twice.
           </p>
           <label class="control">
             <span>Atlas loses <output id="lost-out2">40</output>% of replies</span>
             <input id="lost" type="range" min="0" max="100" value="40" />
           </label>
-          <p class="aside">Failed declines, by contrast, charged nothing, so those do fail over.</p>
-        </div>
-      </section>
+          <p class="aside">Declines, by contrast, charged nothing, so those do fail over.</p>
+        </section>
 
-      <section class="chapter" data-chapter="4">
-        <div class="copy">
+        <section class="chapter" data-chapter="4">
+          <p class="eyebrow">Idempotency</p>
           <h2>Replay</h2>
           <p>
-            A client that retries a request with the same idempotency key gets the original
-            result, never a second charge. The pale particles bounce straight back from the
-            gateway. Send one payment 25 times at once and count the charges.
+            A client that retries a request with the same idempotency key gets the original result,
+            never a second charge. The hollow dots bounce straight back from the gateway. Send one
+            payment 25 times at once and count the charges.
           </p>
           <div class="buttons">
             <button type="button" id="replay">Send one payment 25 times</button>
           </div>
           <p class="result" id="replay-out" aria-live="polite">&nbsp;</p>
-        </div>
-      </section>
-    </main>
+        </section>
+      </main>
 
-    <aside class="ledger" id="ledger" aria-live="off" aria-label="Live counters">
-      <dl>
-        <div><dt>payments</dt><dd id="l-payments">0</dd></div>
-        <div><dt>captured</dt><dd id="l-captured">0</dd></div>
-        <div><dt>failed</dt><dd id="l-failed" class="bad">0</dd></div>
-        <div><dt>unknown</dt><dd id="l-unknown" class="warn">0</dd></div>
-        <div><dt>replays</dt><dd id="l-replays">0</dd></div>
-        <div class="key"><dt>double charges</dt><dd id="l-double" class="ok">0</dd></div>
-      </dl>
-      <ul class="workers" id="l-providers"></ul>
-    </aside>
+      <aside class="panel" aria-label="Live payment flow">
+        <canvas id="flow" role="img" aria-label="Diagram of payments moving from a client through a gateway to three providers and a ledger"></canvas>
+
+        <dl class="counters" id="ledger">
+          <div><dt>payments</dt><dd id="l-payments">0</dd></div>
+          <div><dt>captured</dt><dd id="l-captured">0</dd></div>
+          <div><dt>failed</dt><dd id="l-failed" class="bad">0</dd></div>
+          <div><dt>unknown</dt><dd id="l-unknown" class="warn">0</dd></div>
+          <div><dt>replays</dt><dd id="l-replays">0</dd></div>
+          <div class="key"><dt>double charges</dt><dd id="l-double">0</dd></div>
+        </dl>
+
+        <ol class="tape" id="tape" aria-label="Recent payment events"></ol>
+      </aside>
+    </div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

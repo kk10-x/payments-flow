@@ -1,39 +1,66 @@
-import Lenis from "lenis";
 import { Api } from "./api.ts";
-import { PaymentScene, WORKER_COLORS } from "./scene.ts";
+import { FlowView } from "./flow.ts";
+import type { PayEvent } from "../../shared/types.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const api = new Api();
 
-// ---- 3D scene (optional: the page still works without WebGL) ---------------------------------
-let scene: PaymentScene | null = null;
+// ---- flow diagram (2D canvas; the page still works if it can't start) -----------------------
 try {
-  scene = new PaymentScene($("stage") as HTMLCanvasElement, reduced);
-  api.on((e) => scene?.handle(e));
+  const flow = new FlowView($("flow") as HTMLCanvasElement, () => api.view, reduced);
+  api.on((e) => flow.handle(e));
 } catch {
-  document.documentElement.classList.add("no-gl");
+  document.documentElement.classList.add("no-canvas");
 }
 
-// ---- scroll: chapter index drives the camera --------------------------------------------------
-const chapters = [...document.querySelectorAll<HTMLElement>("[data-chapter]")];
-function onScroll() {
-  scene?.setStop(scrollY / innerHeight);
+// ---- event tape -----------------------------------------------------------------------------
+const tape = $("tape");
+const TAPE_ROWS = 5;
+const name = (id: number) => api.view.providers[id - 1]?.name ?? `provider ${id}`;
+function addRow(id: number, stamp: string, cls: string, note: string) {
+  const li = document.createElement("li");
+  const idEl = document.createElement("span");
+  idEl.className = "id";
+  idEl.textContent = `#${id}`;
+  const st = document.createElement("span");
+  st.className = `stamp ${cls}`;
+  const inner = document.createElement("span");
+  inner.textContent = stamp;
+  st.append(inner);
+  const nt = document.createElement("span");
+  nt.className = "note";
+  nt.textContent = note;
+  li.append(idEl, st, nt);
+  tape.prepend(li);
+  while (tape.children.length > TAPE_ROWS) tape.lastElementChild!.remove();
 }
-if (!reduced) {
-  const lenis = new Lenis({ lerp: 0.1 });
-  const raf = (t: number) => {
-    lenis.raf(t);
-    requestAnimationFrame(raf);
-  };
-  requestAnimationFrame(raf);
-  lenis.on("scroll", onScroll);
+function onEvent(e: PayEvent) {
+  switch (e.type) {
+    case "settled":
+      addRow(e.id, "captured", "ok", `${name(e.provider)} · ${e.ms} ms`);
+      break;
+    case "attemptFailed":
+      if (e.kind === "timeout") addRow(e.id, "timeout", "warn", `${name(e.provider)} · outcome unknown, retrying same provider`);
+      else addRow(e.id, e.kind, "bad", `${name(e.provider)} · charged nothing, may fail over`);
+      break;
+    case "replayed":
+      addRow(e.id, "replayed", "", "answered from the idempotency store, no new charge");
+      break;
+    case "failed":
+      addRow(e.id, "failed", "bad solid", "every provider declined, nothing charged");
+      break;
+    case "unknown":
+      addRow(e.id, "unknown", "warn solid", "needs reconciliation with the provider");
+      break;
+    default:
+      break;
+  }
 }
-addEventListener("scroll", onScroll, { passive: true });
-onScroll();
+api.on(onEvent);
 
-// ---- controls ---------------------------------------------------------------------------------
+// ---- controls -------------------------------------------------------------------------------
 const rps = $<HTMLInputElement>("rps");
 const fail = $<HTMLInputElement>("fail");
 const lost = $<HTMLInputElement>("lost");
@@ -62,7 +89,7 @@ $("replay").addEventListener("click", async () => {
 });
 
 const BASE_FAIL = 0.02;
-// Scrolling into a chapter sets up the scenario for that chapter.
+// Scrolling a chapter into view sets up the scenario for that chapter.
 const onChapter: Record<number, () => void> = {
   0: () => {
     api.setConfig({ rps: 6 });
@@ -90,6 +117,7 @@ const onChapter: Record<number, () => void> = {
     api.setProvider(2, { failureRate: BASE_FAIL });
   },
 };
+const chapters = [...document.querySelectorAll<HTMLElement>("[data-chapter]")];
 let current = -1;
 const io = new IntersectionObserver(
   (entries) => {
@@ -98,21 +126,16 @@ const io = new IntersectionObserver(
       const i = Number((en.target as HTMLElement).dataset.chapter);
       if (i === current) continue;
       current = i;
+      chapters.forEach((c) => c.classList.toggle("active", c === en.target));
       onChapter[i]?.();
     }
   },
-  { threshold: 0.55 },
+  { rootMargin: "-35% 0px -35% 0px", threshold: 0 },
 );
 chapters.forEach((c) => io.observe(c));
+chapters[0]?.classList.add("active");
 
-// ---- ledger -----------------------------------------------------------------------------------
-const provEl = $("l-providers");
-provEl.innerHTML = [1, 2, 3]
-  .map(
-    (id) =>
-      `<li id="lp-${id}" style="--c:#${WORKER_COLORS[id - 1]!.getHexString()}"><span class="nm"></span><span class="n"></span></li>`,
-  )
-  .join("");
+// ---- counters -------------------------------------------------------------------------------
 const fmt = (n: number) => n.toLocaleString("en-US");
 setInterval(() => {
   const v = api.view;
@@ -126,13 +149,6 @@ setInterval(() => {
   $("l-unknown").textContent = fmt(s.unknown);
   $("l-replays").textContent = fmt(s.replays);
   $("l-double").textContent = fmt(s.doubleCharges);
-  for (const p of v.providers) {
-    const li = $(`lp-${p.id}`);
-    li.classList.toggle("down", p.circuit === "open");
-    li.querySelector(".nm")!.textContent = p.name.toLowerCase();
-    li.querySelector(".n")!.textContent =
-      p.circuit === "open" ? "open" : p.circuit === "half-open" ? "probe" : `${Math.round(p.successRate * 100)}%`;
-  }
 }, 150);
 
 api.connect().then(() => onChapter[Math.max(current, 0)]?.());

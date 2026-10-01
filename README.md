@@ -2,7 +2,7 @@
 
 [![demo](https://img.shields.io/badge/demo-live-brightgreen)](https://bella.taile86535.ts.net:10000/payments-flow/)
 
-A mock payment gateway with health-scored provider routing, circuit breakers and idempotent retries, drawn as a scroll-driven 3D particle flow. Each particle is a real payment moving through the code, and the page shows a counter that must always read zero: double charges.
+A mock payment gateway with health-scored provider routing, circuit breakers and idempotent retries, drawn as a live printed-ledger diagram. Each particle is a real payment moving through the code, and the page shows a counter that must always read zero: double charges.
 
 ![Sending one payment 25 times at once: the gateway answers 24 from its idempotency store and the ledger records a single charge](assets/replay-25x.gif)
 
@@ -11,14 +11,14 @@ Most payment-routing demos are diagrams. This one runs the routing: three mock p
 ## Tech stack
 
 - **Backend:** Node.js 20+, TypeScript, `node:http` and `fetch`, [`ws`](https://github.com/websockets/ws) for the event stream
-- **Frontend:** Vite, Three.js (custom point-sprite shaders), [Lenis](https://github.com/darkroomengineering/lenis) for smooth scroll, no UI framework
+- **Frontend:** Vite and TypeScript with a hand-drawn 2D canvas diagram, no UI framework and no runtime dependencies (about 18 kB of JavaScript)
 - **Tests:** `node:test` run through `tsx`, including a chaos test that fires duplicate keys at providers that fail and lose replies
 - **CI:** GitHub Actions: typecheck, tests, production build
 
 ## Architecture
 
 ```
- browser (Three.js scene + controls)
+ browser (2D canvas diagram, event tape, controls)
     │  WebSocket /events ◄── routed · attemptFailed · settled · replayed · failed · unknown · tick
     │  POST /api/*       ──► payments, replay, provider tuning, traffic
     ▼
@@ -35,7 +35,7 @@ Most payment-routing demos are diagrams. This one runs the routing: three mock p
 - **The retry rule is the point.** A decline means nothing was charged, so the next attempt can go to another provider. A timeout is different: the provider may already have charged. The gateway then retries only that provider with the same idempotency key, which returns the original charge. Failing over there could charge the card twice. If retries still can't confirm, the payment ends as `unknown` (needs reconciliation) rather than guessing.
 - **Double charges are measured, not assumed.** The service counts idempotency keys charged by more than one provider. That number is shown on the page and asserted to be 0 in the tests.
 - **Mutation-checked.** With the same-provider rule removed, the lost-response test and the chaos test both fail, so the tests do guard the invariant.
-- **Scene.** One Three.js scene is pinned behind the page and scroll blends between camera stops. Cluster brightness follows provider health, an open breaker scatters its cluster, captured payments fly to the ledger bar, and replayed keys bounce back from the gateway ring. Entering a chapter sets up its scenario (for example, Beacon starts declining 90% of charges).
+- **Design.** A flat, printed-ledger look on ruled paper: client, gateway, three provider boxes and the ledger drawn as line art on a 2D canvas. Payments are dots travelling along ruled routes, failures are crosses, and a replayed key is a hollow dot that bounces straight back from the gateway. A provider's bar shows its success rate, and an open breaker hatches its box. A receipt-style tape under the diagram stamps each event (captured, timeout, replayed, failed, unknown). Entering a chapter sets up its scenario (for example, Beacon starts declining 90% of charges).
 - **Simulated fallback.** If the page can't reach the server (for example on a static host), it runs the same `PaymentService` and `MockProvider` code inside the browser. The header then reads **SIMULATED · IN YOUR BROWSER** instead of **LIVE**.
 
 ## Key features
@@ -45,7 +45,7 @@ Most payment-routing demos are diagrams. This one runs the routing: three mock p
 - Idempotency keys that dedupe both concurrent and later repeats. Sending one key 25 times at once produces one charge.
 - Failure injection from the page: provider decline rate, and the rate at which a provider charges but loses its reply.
 - A live ledger: payments, captured, failed, unknown, replays and double charges.
-- Works without WebGL (the page and controls still work) and respects `prefers-reduced-motion`.
+- No WebGL needed. Respects `prefers-reduced-motion` (the diagram stops animating dots; counters and the tape still update).
 
 ## Setup
 
